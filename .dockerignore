@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/*.user
+**/*.db
+**/*.db-shm
+**/*.db-wal
+.git/
+.github/
+**/node_modules/
+**/TestResults/
+Dockerfile*
+docker-compose*.yml
+DEPLOYMENT.md
+README.md

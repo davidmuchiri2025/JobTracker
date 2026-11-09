@@ -1,0 +1,37 @@
+# Docker Compose for deploying JobTracker on a Docker host.
+# Copy this file to your host (the GitHub Actions SSH deploy can do this automatically).
+#
+# Required environment variables (set in a .env file next to this compose file, or export them):
+#   PUBLIC_WEB_URL  - Public URL users access, e.g. https://jobs.example.com or http://<host-ip>:8080
+#
+# If GHCR images are private, run `docker login ghcr.io` on the host (or use a PAT with read:packages).
+
+services:
+  api:
+    image: ghcr.io/davidmuchiri2025/jobtracker-api:latest
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Default: "Data Source=/home/data/jobtracker.db"
+      Cors__WebOrigin: "${PUBLIC_WEB_URL:-http://localhost:8080}"
+    volumes:
+      - jobtracker-data:/home/data
+    expose:
+      - "8080"
+
+  web:
+    image: ghcr.io/davidmuchiri2025/jobtracker-web:latest
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      # Server-side Blazor calls the API over the internal Docker network.
+      Api__BaseUrl: "http://api:8080"
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+
+volumes:
+  jobtracker-data:
