@@ -1,0 +1,139 @@
+@page "/jobs"
+@rendermode InteractiveServer
+@using JobTracker.Shared
+@using JobTracker.Web.Services
+@inject JobsApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Job Applications</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Job Applications</h1>
+    <a class="btn btn-primary" href="jobs/new">New Application</a>
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-6">
+        <input class="form-control" placeholder="Search company, position, or location"
+               @bind="search" @bind:event="oninput" @bind:after="LoadAsync" />
+    </div>
+    <div class="col-md-4">
+        <select class="form-select" @bind="statusFilter" @bind:after="LoadAsync">
+            <option value="">All statuses</option>
+            @foreach (var status in Enum.GetValues<JobApplicationStatus>())
+            {
+                <option value="@status">@status</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-outline-secondary w-100" @onclick="LoadAsync" disabled="@loading">Refresh</button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (jobs.Count == 0)
+{
+    <div class="alert alert-secondary">No job applications found.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Company</th>
+                    <th>Position</th>
+                    <th>Status</th>
+                    <th>Applied</th>
+                    <th>Location</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var job in jobs)
+                {
+                    <tr>
+                        <td>@job.Company</td>
+                        <td>@job.Position</td>
+                        <td><span class="badge @StatusClass(job.Status)">@job.Status</span></td>
+                        <td>@(job.AppliedDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                        <td>@(job.Location ?? "-")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary me-1" href="jobs/@job.Id">Edit</a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(job)" disabled="@loading">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (pendingDelete is not null)
+{
+    <div class="alert alert-warning">
+        <div class="mb-2">Delete <strong>@pendingDelete.Company - @pendingDelete.Position</strong>?</div>
+        <button class="btn btn-danger btn-sm me-2" @onclick="DeleteConfirmedAsync" disabled="@loading">Delete</button>
+        <button class="btn btn-secondary btn-sm" @onclick="() => pendingDelete = null" disabled="@loading">Cancel</button>
+    </div>
+}
+
+@code {
+    private List<JobApplicationDto> jobs = [];
+    private bool loading = true;
+    private string? error;
+    private string search = string.Empty;
+    private string statusFilter = string.Empty;
+    private JobApplicationDto? pendingDelete;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        pendingDelete = null;
+        try
+        {
+            JobApplicationStatus? status = Enum.TryParse<JobApplicationStatus>(statusFilter, out var parsed) ? parsed : null;
+            jobs = await Api.GetAllAsync(search, status);
+        }
+        catch (Exception ex)
+        {
+            error = $"Could not load job applications. Is the API running at the configured URL? ({ex.Message})";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void ConfirmDelete(JobApplicationDto job) => pendingDelete = job;
+
+    private async Task DeleteConfirmedAsync()
+    {
+        if (pendingDelete is null) return;
+        loading = true;
+        error = await Api.DeleteAsync(pendingDelete.Id);
+        await LoadAsync();
+    }
+
+    private static string StatusClass(JobApplicationStatus status) => status switch
+    {
+        JobApplicationStatus.Wishlist => "text-bg-secondary",
+        JobApplicationStatus.Applied => "text-bg-primary",
+        JobApplicationStatus.Interviewing => "text-bg-info",
+        JobApplicationStatus.Offer => "text-bg-success",
+        JobApplicationStatus.Rejected => "text-bg-danger",
+        JobApplicationStatus.Accepted => "text-bg-success",
+        _ => "text-bg-secondary"
+    };
+}

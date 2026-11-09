@@ -1,0 +1,163 @@
+@page "/jobs/new"
+@page "/jobs/{Id:int}"
+@rendermode InteractiveServer
+@using JobTracker.Shared
+@using JobTracker.Web.Services
+@inject JobsApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "New Job Application" : "Edit Job Application")</PageTitle>
+
+<h1>@(IsNew ? "New Job Application" : "Edit Job Application")</h1>
+
+@if (!string.IsNullOrWhiteSpace(loadError))
+{
+    <div class="alert alert-danger">@loadError</div>
+}
+else if (loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="job-form">
+        <DataAnnotationsValidator />
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Company *</label>
+                <InputText class="form-control" @bind-Value="model.Company" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Position *</label>
+                <InputText class="form-control" @bind-Value="model.Position" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Status</label>
+                <InputSelect class="form-select" @bind-Value="model.Status">
+                    @foreach (var status in Enum.GetValues<JobApplicationStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Applied Date</label>
+                <InputDate class="form-control" @bind-Value="model.AppliedDate" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Location</label>
+                <InputText class="form-control" @bind-Value="model.Location" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Job URL</label>
+                <InputText class="form-control" @bind-Value="model.JobUrl" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Salary Range</label>
+                <InputText class="form-control" @bind-Value="model.SalaryRange" />
+            </div>
+            <div class="col-12">
+                <label class="form-label">Notes</label>
+                <InputTextArea class="form-control" rows="4" @bind-Value="model.Notes" />
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(saveError))
+        {
+            <div class="alert alert-danger mt-3">@saveError</div>
+        }
+
+        <div class="mt-3">
+            <button class="btn btn-primary me-2" type="submit" disabled="@saving">@(saving ? "Saving..." : "Save")</button>
+            <a class="btn btn-outline-secondary" href="jobs">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private JobApplicationRequest model = new();
+    private bool loading;
+    private bool saving;
+    private string? loadError;
+    private string? saveError;
+
+    private bool IsNew => !Id.HasValue;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsNew)
+        {
+            model = new JobApplicationRequest();
+            return;
+        }
+
+        loading = true;
+        loadError = null;
+        try
+        {
+            var item = await Api.GetAsync(Id!.Value);
+            if (item is null)
+            {
+                loadError = "Job application not found.";
+                return;
+            }
+
+            model = new JobApplicationRequest
+            {
+                Company = item.Company,
+                Position = item.Position,
+                Status = item.Status,
+                AppliedDate = item.AppliedDate,
+                Location = item.Location,
+                JobUrl = item.JobUrl,
+                SalaryRange = item.SalaryRange,
+                Notes = item.Notes
+            };
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Could not load job application. ({ex.Message})";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        saveError = null;
+        if (string.IsNullOrWhiteSpace(model.Company) || string.IsNullOrWhiteSpace(model.Position))
+        {
+            saveError = "Company and Position are required.";
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            var result = IsNew
+                ? await Api.CreateAsync(model)
+                : await Api.UpdateAsync(Id!.Value, model);
+
+            if (result.Error is not null)
+            {
+                saveError = result.Error;
+                return;
+            }
+
+            Nav.NavigateTo("jobs");
+        }
+        catch (Exception ex)
+        {
+            saveError = $"Could not save job application. ({ex.Message})";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

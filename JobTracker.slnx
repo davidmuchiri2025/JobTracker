@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JobTracker.Api/JobTracker.Api.csproj" />
+    <Project Path="src/JobTracker.Shared/JobTracker.Shared.csproj" />
+  </Folder>
+  <Folder Name="/src/JobTracker.Web/">
+    <Project Path="src/JobTracker.Web/JobTracker.Web.Client/JobTracker.Web.Client.csproj" />
+    <Project Path="src/JobTracker.Web/JobTracker.Web/JobTracker.Web.csproj" />
+  </Folder>
+</Solution>
